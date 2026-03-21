@@ -1,1 +1,415 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Resumos da Wikipédia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para a barra de rolagem da área de código */
+        pre::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        pre::-webkit-scrollbar-track {
+            background: #1f2937; 
+            border-radius: 4px;
+        }
+        pre::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 4px;
+        }
+        pre::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+    </style>
+</head>
+<body class="bg-[#F5EEF8] min-h-screen font-sans text-gray-800 p-4 sm:p-8 flex flex-col transition-colors duration-300">
 
+    <div class="max-w-4xl mx-auto space-y-8 flex-grow w-full">
+        
+        <!-- Cabeçalho -->
+        <header class="text-center space-y-4">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-[#756D79] tracking-tight">
+                Gerador de Resumos Wikipédia
+            </h1>
+            <p class="text-[#756D79] opacity-80 max-w-xl mx-auto">
+                Digite um termo para obter o resumo da Wikipédia. Escolha um estilo e o aplicativo gerará a pré-visualização e o código HTML pronto para usar.
+            </p>
+        </header>
+
+        <!-- Barra de Pesquisa e Seletor de Estilos -->
+        <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-[#EADDED] flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="w-5 h-5 text-[#C490D1]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="text" id="searchInput" 
+                        class="block w-full pl-10 pr-3 py-3 border border-[#EADDED] rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C490D1] focus:border-[#C490D1] transition-colors" 
+                        placeholder="Ex: Inteligência artificial, Brasil, Buraco negro..."
+                        autofocus>
+                </div>
+                <button id="searchBtn" 
+                    class="w-full sm:w-auto px-6 py-3 bg-[#756D79] hover:bg-[#5b545f] text-white font-medium rounded-xl transition-colors shadow-sm flex items-center justify-center gap-2">
+                    <span>Buscar</span>
+                </button>
+            </div>
+            
+            <!-- Seletor de Estilos Adicionado -->
+            <div class="flex items-center justify-start gap-3 pt-2 border-t border-[#F5EEF8] mt-1">
+                <label for="styleTheme" class="text-sm font-semibold text-[#756D79]">Estilo Visual:</label>
+                <select id="styleTheme" class="bg-[#F5EEF8] border border-[#EADDED] text-[#756D79] font-medium text-sm rounded-lg focus:ring-[#C490D1] focus:border-[#C490D1] block p-2 cursor-pointer transition-colors shadow-sm">
+                    <option value="moderno">Moderno (Padrão)</option>
+                    <option value="elegante">Sofisticado</option>
+                    <option value="escuro">Modo Escuro</option>
+                    <option value="minimalista">Minimalista</option>
+                    <option value="retro">Clássico / Retrô</option>
+                    <option value="neon">Neon / Cyberpunk</option>
+                    <option value="material">Material Design</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Estado de Carregamento -->
+        <div id="loadingState" class="hidden text-center py-12">
+            <svg class="animate-spin h-10 w-10 text-[#C490D1] mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-[#756D79] font-medium">A buscar na Wikipédia...</p>
+        </div>
+
+        <!-- Mensagem de Erro -->
+        <div id="errorState" class="hidden bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-center">
+            <p id="errorMessage" class="font-medium">Artigo não encontrado. Tente outro termo.</p>
+        </div>
+
+        <!-- Container de Resultados -->
+        <div id="resultsContainer" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            
+            <!-- Coluna 1: Pré-visualização -->
+            <div class="space-y-4">
+                <h2 class="text-xl font-bold text-[#756D79] flex items-center gap-2">
+                    <svg class="w-5 h-5 text-[#C490D1]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    Pré-visualização Visual
+                </h2>
+                <div id="visualPreview" class="bg-white p-6 rounded-2xl shadow-inner border border-[#EADDED] overflow-hidden min-h-[400px] flex justify-center items-start transition-colors duration-300">
+                    <!-- O HTML renderizado será inserido aqui -->
+                </div>
+            </div>
+
+            <!-- Coluna 2: Código HTML -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-xl font-bold text-[#756D79] flex items-center gap-2">
+                        <svg class="w-5 h-5 text-[#756D79]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                        Código HTML Gerado
+                    </h2>
+                    <button id="copyBtn" class="text-sm bg-[#F5EEF8] hover:bg-[#EADDED] text-[#756D79] px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1.5 border border-[#EADDED]">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        <span>Copiar HTML</span>
+                    </button>
+                </div>
+                <div class="relative bg-gray-900 rounded-2xl shadow-sm border border-gray-800 overflow-hidden h-full min-h-[400px]">
+                    <pre class="h-full"><code id="codePreview" class="block p-4 sm:p-6 text-sm text-green-400 overflow-x-auto whitespace-pre-wrap break-words font-mono h-full"></code></pre>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Rodapé Adicionado -->
+    <footer class="mt-16 pt-8 pb-4 text-center border-t border-[#EADDED]">
+        <div class="max-w-4xl mx-auto space-y-3 px-4">
+            <p class="text-[#756D79] font-medium">
+                Desenvolvido com dedicação pelo professor Glauber Santiago — DAC/UFSCar.
+            </p>
+            <div>
+                <p class="text-sm text-[#756D79] opacity-80 mb-2">Acompanhe outros trabalhos e projetos:</p>
+                <div class="flex flex-col sm:flex-row justify-center items-center gap-3 sm:gap-6 text-sm">
+                    <a href="https://servidores.ufscar.br/glauber/" target="_blank" rel="noopener noreferrer" 
+                       class="text-[#756D79] hover:text-[#C490D1] hover:underline transition-colors flex items-center gap-1.5 font-medium">
+                        🏛️ servidores.ufscar.br/glauber/
+                    </a>
+                    <a href="https://sites.google.com/view/glauberia" target="_blank" rel="noopener noreferrer" 
+                       class="text-[#756D79] hover:text-[#C490D1] hover:underline transition-colors flex items-center gap-1.5 font-medium">
+                        🌐 sites.google.com/view/glauberia
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Elementos do DOM
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const styleTheme = document.getElementById('styleTheme');
+        const loadingState = document.getElementById('loadingState');
+        const errorState = document.getElementById('errorState');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const visualPreview = document.getElementById('visualPreview');
+        const codePreview = document.getElementById('codePreview');
+        const copyBtn = document.getElementById('copyBtn');
+
+        // Estado global para manter os dados da pesquisa atual
+        let currentWikiData = null;
+
+        // Dicionário de estilos contendo os temas disponíveis
+        const themes = {
+            moderno: {
+                card: "font-family: system-ui, -apple-system, sans-serif; max-width: 600px; w-full; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); color: #1f2937; overflow: hidden;",
+                header: "display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #f3f4f6;",
+                title: "margin: 0; font-size: 22px; font-weight: bold; color: #111827;",
+                badge: "font-size: 11px; font-weight: 600; background-color: #f3f4f6; padding: 4px 8px; border-radius: 4px; color: #4b5563; letter-spacing: 0.5px;",
+                body: "padding: 24px;",
+                img: "display: block; width: 100%; height: auto; max-height: 400px; object-fit: contain; background-color: #f9fafb; border-radius: 8px; margin-bottom: 16px; border: 1px solid #e5e7eb;",
+                text: "margin: 0 0 20px 0; font-size: 15px; line-height: 1.6; color: #4b5563;",
+                btn: "display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 6px; font-weight: 500; font-size: 14px; text-align: center;"
+            },
+            elegante: {
+                card: "font-family: 'Palatino Linotype', 'Book Antiqua', Palatino, serif; max-width: 600px; w-full; border: 1px solid #756D79; border-radius: 16px; background-color: #faf9fa; box-shadow: 0 8px 20px rgba(117, 109, 121, 0.15); overflow: hidden;",
+                header: "display: flex; align-items: center; justify-content: space-between; padding: 24px 28px; border-bottom: 2px solid #756D79; background-color: #ffffff;",
+                title: "margin: 0; font-size: 24px; font-weight: bold; color: #756D79; letter-spacing: 0.5px;",
+                badge: "font-size: 11px; font-weight: bold; background-color: #756D79; padding: 4px 10px; border-radius: 20px; color: #ffffff; text-transform: uppercase; letter-spacing: 1px;",
+                body: "padding: 28px;",
+                img: "display: block; width: 100%; height: auto; max-height: 400px; object-fit: cover; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);",
+                text: "margin: 0 0 24px 0; font-size: 16px; line-height: 1.7; color: #4a454d;",
+                btn: "display: inline-block; background-color: #756D79; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; text-align: center;"
+            },
+            escuro: {
+                card: "font-family: system-ui, -apple-system, sans-serif; max-width: 600px; w-full; border: 1px solid #374151; border-radius: 12px; background-color: #1f2937; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5); overflow: hidden;",
+                header: "display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #374151; background-color: #111827;",
+                title: "margin: 0; font-size: 22px; font-weight: bold; color: #f9fafb;",
+                badge: "font-size: 11px; font-weight: 600; background-color: #374151; padding: 4px 8px; border-radius: 4px; color: #d1d5db; letter-spacing: 0.5px;",
+                body: "padding: 24px;",
+                img: "display: block; width: 100%; height: auto; max-height: 400px; object-fit: contain; background-color: #111827; border-radius: 8px; margin-bottom: 16px; border: 1px solid #374151;",
+                text: "margin: 0 0 20px 0; font-size: 15px; line-height: 1.6; color: #d1d5db;",
+                btn: "display: inline-block; background-color: #3b82f6; color: #ffffff; text-decoration: none; padding: 10px 18px; border-radius: 6px; font-weight: 500; font-size: 14px; text-align: center;"
+            },
+            minimalista: {
+                card: "font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; w-full; background-color: #ffffff; color: #000000;",
+                header: "display: flex; align-items: baseline; justify-content: space-between; padding: 16px 0; border-top: 2px solid #000; border-bottom: 1px solid #e5e5e5;",
+                title: "margin: 0; font-size: 24px; font-weight: normal; color: #000; letter-spacing: -0.5px;",
+                badge: "font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666;",
+                body: "padding: 20px 0;",
+                img: "display: block; width: 100%; height: auto; max-height: 400px; object-fit: cover; margin-bottom: 20px; filter: grayscale(10%);",
+                text: "margin: 0 0 24px 0; font-size: 16px; line-height: 1.7; color: #333;",
+                btn: "display: inline-block; color: #000; text-decoration: none; padding: 8px 0; border-bottom: 1px solid #000; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;"
+            },
+            retro: {
+                card: "font-family: 'Georgia', serif; max-width: 600px; w-full; border: 4px double #8b4513; border-radius: 2px; background-color: #fdf5e6; box-shadow: 3px 3px 0px rgba(139,69,19,0.2); overflow: hidden;",
+                header: "display: flex; align-items: center; justify-content: space-between; padding: 20px; border-bottom: 1px solid #d2b48c; background-color: #faebd7;",
+                title: "margin: 0; font-size: 26px; font-weight: normal; font-style: italic; color: #5c3317;",
+                badge: "font-size: 10px; font-family: sans-serif; text-transform: uppercase; border: 1px dashed #cd853f; padding: 2px 6px; color: #8b4513;",
+                body: "padding: 24px;",
+                img: "display: block; width: 100%; height: auto; max-height: 400px; object-fit: contain; background-color: #fff8dc; border: 1px solid #deb887; margin-bottom: 20px; padding: 4px;",
+                text: "margin: 0 0 20px 0; font-size: 16px; line-height: 1.8; color: #3e2723; text-align: justify;",
+                btn: "display: inline-block; background-color: #8b4513; color: #fdf5e6; font-family: sans-serif; text-decoration: none; padding: 8px 16px; border-radius: 2px; font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;"
+            },
+            neon: {
+                card: "font-family: 'Courier New', Courier, monospace; max-width: 600px; w-full; border: 1px solid #ff00ff; border-radius: 8px; background-color: #050510; box-shadow: 0 0 10px rgba(255,0,255,0.3), inset 0 0 10px rgba(0,255,255,0.1); overflow: hidden;",
+                header: "display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px dashed #00ffff; background-color: rgba(255,0,255,0.05);",
+                title: "margin: 0; font-size: 20px; font-weight: bold; color: #00ffff; text-shadow: 0 0 5px #00ffff;",
+                badge: "font-size: 10px; font-weight: bold; background-color: #ff00ff; padding: 2px 6px; border-radius: 2px; color: #fff; box-shadow: 0 0 5px #ff00ff;",
+                body: "padding: 24px;",
+                img: "display: block; width: 100%; height: auto; max-height: 400px; object-fit: contain; background-color: #ffffff; border: 1px solid #00ffff; margin-bottom: 20px; box-shadow: 0 0 8px rgba(0,255,255,0.4); padding: 4px; border-radius: 4px;",
+                text: "margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #e0e0ff; text-shadow: 0 0 1px rgba(224,224,255,0.5);",
+                btn: "display: inline-block; background-color: transparent; color: #ff00ff; border: 1px solid #ff00ff; text-decoration: none; padding: 8px 16px; font-weight: bold; font-size: 14px; text-transform: uppercase; box-shadow: 0 0 5px rgba(255,0,255,0.5), inset 0 0 5px rgba(255,0,255,0.3); transition: all 0.2s;"
+            },
+            material: {
+                card: "font-family: 'Roboto', 'Segoe UI', sans-serif; max-width: 600px; w-full; border-radius: 8px; background-color: #ffffff; box-shadow: 0 3px 1px -2px rgba(0,0,0,0.2), 0 2px 2px 0 rgba(0,0,0,0.14), 0 1px 5px 0 rgba(0,0,0,0.12); overflow: hidden;",
+                header: "padding: 24px 24px 16px 24px; background-color: #6200ea; display: flex; flex-direction: column; gap: 8px;",
+                title: "margin: 0; font-size: 24px; font-weight: 500; color: #ffffff; line-height: 1.2;",
+                badge: "font-size: 10px; font-weight: 500; background-color: #03dac6; color: #000000; padding: 4px 8px; border-radius: 16px; align-self: flex-start; text-transform: uppercase; letter-spacing: 1px;",
+                body: "padding: 0;",
+                img: "display: block; width: 100%; height: auto; max-height: 300px; object-fit: cover; margin-bottom: 0;",
+                text: "margin: 0; padding: 16px 24px; font-size: 14px; line-height: 1.5; color: rgba(0,0,0,0.87);",
+                btn: "display: inline-block; color: #6200ea; text-decoration: none; padding: 8px 16px; margin: 8px 16px 16px 8px; border-radius: 4px; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1.25px;"
+            }
+        };
+
+        // Função para formatar o termo para a URL
+        const formatTerm = (term) => {
+            return encodeURIComponent(term.trim().replace(/\s+/g, '_'));
+        };
+
+        // Função para gerar o código HTML final que o utilizador vai copiar baseado no estilo escolhido
+        const generateHTMLSnippet = (data, styleKey) => {
+            const title = data.title;
+            const text = data.extract;
+            const url = data.content_urls?.desktop?.page || `https://pt.wikipedia.org/wiki/${formatTerm(title)}`;
+            const s = themes[styleKey] || themes.moderno; // Fallback para moderno
+            
+            let imageHTML = '';
+            if (data.thumbnail && data.thumbnail.source) {
+                imageHTML = `
+        <!-- Imagem principal -->
+        <img src="${data.thumbnail.source}" alt="${title}" style="${s.img}" />`;
+            }
+
+            // O código HTML estruturado com os estilos inline injetados dinamicamente
+            return `<!-- Resumo da Wikipédia: ${title} -->
+<div class="wiki-summary-card" style="${s.card}">
+    
+    <!-- Cabeçalho -->
+    <div style="${s.header}">
+        <h2 style="${s.title}">${title}</h2>
+        <span style="${s.badge}">WIKIPÉDIA</span>
+    </div>
+    
+    <!-- Corpo -->
+    <div style="${s.body}">
+        ${imageHTML}
+        <!-- Texto do Resumo -->
+        <p style="${s.text}">${text}</p>
+        
+        <!-- Link para artigo completo -->
+        <a href="${url}" target="_blank" rel="noopener noreferrer" style="${s.btn}">Ler artigo completo →</a>
+    </div>
+
+</div>`;
+        };
+
+        // Escapa HTML para poder ser mostrado dentro da tag <pre><code> sem ser renderizado
+        const escapeHTML = (str) => {
+            return str.replace(/[&<>'"]/g, 
+                tag => ({
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    "'": '&#39;',
+                    '"': '&quot;'
+                }[tag] || tag)
+            );
+        };
+
+        // Renderiza os resultados no ecrã (Separada para permitir mudar de tema sem refazer o fetch)
+        const renderResults = () => {
+            if (!currentWikiData) return;
+            
+            const selectedStyle = styleTheme.value;
+            const generatedHTML = generateHTMLSnippet(currentWikiData, selectedStyle);
+
+            // Ajusta o fundo da área de visualização para constrastar melhor com os temas
+            if (selectedStyle === 'escuro' || selectedStyle === 'neon') {
+                visualPreview.className = "bg-gray-800 p-6 rounded-2xl shadow-inner border border-gray-700 overflow-hidden min-h-[400px] flex justify-center items-start transition-colors duration-300";
+            } else {
+                visualPreview.className = "bg-white p-6 rounded-2xl shadow-inner border border-[#EADDED] overflow-hidden min-h-[400px] flex justify-center items-start transition-colors duration-300";
+            }
+
+            // Renderiza a pré-visualização (Injetando no DOM)
+            visualPreview.innerHTML = generatedHTML;
+
+            // Mostra o código fonte no bloco <pre>
+            codePreview.innerHTML = escapeHTML(generatedHTML);
+
+            // Garante que a UI de loading desapareça e os resultados apareçam
+            loadingState.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+        };
+
+        // Função principal de pesquisa via API
+        const performSearch = async () => {
+            const term = searchInput.value.trim();
+            if (!term) return;
+
+            // Atualiza UI
+            loadingState.classList.remove('hidden');
+            errorState.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+            copyBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg><span>Copiar HTML</span>';
+            copyBtn.classList.remove('text-[#C490D1]', 'bg-[#F5EEF8]');
+
+            try {
+                // Requisição à API REST v1 da Wikipédia em português
+                const apiUrl = `https://pt.wikipedia.org/api/rest_v1/page/summary/${formatTerm(term)}`;
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error(`O termo "${term}" não foi encontrado na Wikipédia.`);
+                    }
+                    throw new Error("Ocorreu um erro ao comunicar com a Wikipédia.");
+                }
+
+                const data = await response.json();
+
+                // Verifica se é um artigo de desambiguação (vários significados)
+                if (data.type === 'disambiguation') {
+                     throw new Error(`"${term}" pode referir-se a vários artigos. Por favor, seja mais específico.`);
+                }
+
+                // Guarda os dados globalmente para quando o utilizador trocar de tema
+                currentWikiData = data;
+                
+                // Processa a geração visual e de código
+                renderResults();
+
+            } catch (error) {
+                loadingState.classList.add('hidden');
+                errorMessage.textContent = error.message;
+                errorState.classList.remove('hidden');
+            }
+        };
+
+        // Eventos
+        searchBtn.addEventListener('click', performSearch);
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        // Quando o utilizador muda o estilo no dropdown, atualiza imediatamente se houver dados
+        styleTheme.addEventListener('change', () => {
+            if (currentWikiData) {
+                renderResults();
+            }
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const htmlToCopy = codePreview.textContent;
+            
+            try {
+                // Usando execCommand como fallback seguro para iframes e ambientes restritos
+                const tempTextArea = document.createElement("textarea");
+                tempTextArea.value = htmlToCopy;
+                tempTextArea.style.position = "fixed";
+                tempTextArea.style.left = "-9999px";
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                
+                const successful = document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+
+                if (successful) {
+                    copyBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span>Copiado!</span>';
+                    copyBtn.classList.add('text-[#C490D1]', 'bg-[#F5EEF8]');
+                    
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg><span>Copiar HTML</span>';
+                        copyBtn.classList.remove('text-[#C490D1]', 'bg-[#F5EEF8]');
+                    }, 2000);
+                } else {
+                    throw new Error("Comando de cópia falhou");
+                }
+            } catch (err) {
+                const errorToast = document.createElement('div');
+                errorToast.className = 'fixed bottom-4 right-4 bg-red-600 text-white px-6 py-3 rounded-xl shadow-lg font-medium transition-opacity z-50';
+                errorToast.innerText = 'Falha ao copiar. Por favor, selecione o texto e copie manualmente.';
+                document.body.appendChild(errorToast);
+                
+                setTimeout(() => {
+                    errorToast.style.opacity = '0';
+                    setTimeout(() => document.body.removeChild(errorToast), 300);
+                }, 4000);
+            }
+        });
+
+    </script>
+</body>
+</html>
